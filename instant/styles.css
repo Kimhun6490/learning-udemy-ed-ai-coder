@@ -1,0 +1,107 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+  background: #0a0a12;
+  color: #e8e8f0;
+}
+
+#c {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+#c:focus {
+  outline: none;
+}
+
+#hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent);
+}
+
+#health-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 15px;
+}
+
+#hint {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+#crosshair {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border: 2px solid rgba(255, 100, 100, 0.9);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 0 8px rgba(255, 80, 80, 0.6);
+}
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(6, 8, 18, 0.88);
+  z-index: 10;
+}
+
+#overlay.hidden {
+  display: none;
+}
+
+#overlay h1 {
+  font-size: 28px;
+  font-weight: 600;
+}
+
+#overlay p {
+  opacity: 0.85;
+  max-width: 320px;
+  text-align: center;
+}
+
+#restart {
+  margin-top: 8px;
+  padding: 10px 22px;
+  font-size: 15px;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  background: #3d6ad4;
+  color: #fff;
+  pointer-events: auto;
+}
+
+#restart:hover {
+  background: #4a78e8;
+}
