@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -13,11 +13,36 @@ import {
 } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
-import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
+import { fetchBoard, persistBoard } from "@/lib/api";
+import { createId, moveCard, type BoardData } from "@/lib/kanban";
 
-export const KanbanBoard = () => {
-  const [board, setBoard] = useState<BoardData>(() => initialData);
+type KanbanBoardProps = {
+  onLogout?: () => void;
+  refreshToken?: number;
+};
+
+export const KanbanBoard = ({ onLogout, refreshToken = 0 }: KanbanBoardProps) => {
+  const [board, setBoard] = useState<BoardData | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadBoard = async () => {
+      setIsLoading(true);
+      try {
+        const nextBoard = await fetchBoard();
+        setBoard(nextBoard);
+        setError("");
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "Failed to load board.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadBoard();
+  }, [refreshToken]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -25,7 +50,27 @@ export const KanbanBoard = () => {
     })
   );
 
-  const cardsById = useMemo(() => board.cards, [board.cards]);
+  const cardsById = useMemo(() => board?.cards ?? {}, [board]);
+
+  const persistNextBoard = async (nextBoard: BoardData) => {
+    try {
+      await persistBoard(nextBoard);
+      setError("");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save board.");
+    }
+  };
+
+  const applyBoardChange = (update: (current: BoardData) => BoardData) => {
+    setBoard((current) => {
+      if (!current) {
+        return current;
+      }
+      const nextBoard = update(current);
+      void persistNextBoard(nextBoard);
+      return nextBoard;
+    });
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
@@ -35,20 +80,20 @@ export const KanbanBoard = () => {
     const { active, over } = event;
     setActiveCardId(null);
 
-    if (!over || active.id === over.id) {
+    if (!board || !over || active.id === over.id) {
       return;
     }
 
-    setBoard((prev) => ({
-      ...prev,
-      columns: moveCard(prev.columns, active.id as string, over.id as string),
+    applyBoardChange((current) => ({
+      ...current,
+      columns: moveCard(current.columns, active.id as string, over.id as string),
     }));
   };
 
   const handleRenameColumn = (columnId: string, title: string) => {
-    setBoard((prev) => ({
-      ...prev,
-      columns: prev.columns.map((column) =>
+    applyBoardChange((current) => ({
+      ...current,
+      columns: current.columns.map((column) =>
         column.id === columnId ? { ...column, title } : column
       ),
     }));
@@ -56,13 +101,13 @@ export const KanbanBoard = () => {
 
   const handleAddCard = (columnId: string, title: string, details: string) => {
     const id = createId("card");
-    setBoard((prev) => ({
-      ...prev,
+    applyBoardChange((current) => ({
+      ...current,
       cards: {
-        ...prev.cards,
+        ...current.cards,
         [id]: { id, title, details: details || "No details yet." },
       },
-      columns: prev.columns.map((column) =>
+      columns: current.columns.map((column) =>
         column.id === columnId
           ? { ...column, cardIds: [...column.cardIds, id] }
           : column
@@ -71,13 +116,13 @@ export const KanbanBoard = () => {
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
-    setBoard((prev) => {
+    applyBoardChange((current) => {
       return {
-        ...prev,
+        ...current,
         cards: Object.fromEntries(
-          Object.entries(prev.cards).filter(([id]) => id !== cardId)
+          Object.entries(current.cards).filter(([id]) => id !== cardId)
         ),
-        columns: prev.columns.map((column) =>
+        columns: current.columns.map((column) =>
           column.id === columnId
             ? {
                 ...column,
@@ -90,6 +135,14 @@ export const KanbanBoard = () => {
   };
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
+
+  if (isLoading) {
+    return <div className="p-8 text-sm text-[var(--gray-text)]">Loading board...</div>;
+  }
+
+  if (!board) {
+    return <div className="p-8 text-sm text-[var(--secondary-purple)]">Unable to load board.</div>;
+  }
 
   return (
     <div className="relative overflow-hidden">
@@ -118,6 +171,15 @@ export const KanbanBoard = () => {
               <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
                 One board. Five columns. Zero clutter.
               </p>
+              {onLogout ? (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="mt-4 rounded-full border border-[var(--stroke)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--navy-dark)] transition hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)]"
+                >
+                  Log out
+                </button>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">
@@ -131,6 +193,7 @@ export const KanbanBoard = () => {
               </div>
             ))}
           </div>
+          {error ? <p className="text-sm text-[var(--secondary-purple)]">{error}</p> : null}
         </header>
 
         <DndContext
